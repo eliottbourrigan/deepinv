@@ -6,6 +6,7 @@ from deepinv.utils import (
     cal_psnr,
 )
 from deepinv.utils import plot, plot_curves, wandb_plot_curves, rescale_img, zeros_like
+from deepinv.physics import UniformGaussianNoise
 import numpy as np
 from tqdm import tqdm
 import torch
@@ -20,6 +21,7 @@ def train(
     losses,
     eval_dataloader=None,
     physics=None,
+    conditional=False,
     optimizer=None,
     grad_clip=None,
     scheduler=None,
@@ -62,6 +64,7 @@ def train(
     :param torch.utils.data.DataLoader eval_dataloader: Evaluation dataloader.
     :param deepinv.physics.Physics, list[deepinv.physics.Physics] physics: Forward operator(s)
         used by the reconstruction network at train time.
+    :param bool conditional: Train a conditional network, i.e., uses conditional information c for training.
     :param torch.nn.optim optimizer: Torch optimizer for training the network.
     :param float grad_clip: Gradient clipping value for the optimizer. If None, no gradient clipping is performed.
     :param torch.nn.optim scheduler: Torch scheduler for changing the learning rate across iterations.
@@ -188,6 +191,10 @@ def train(
         iterators = [iter(loader) for loader in train_dataloader]
         batches = len(train_dataloader[G - 1])
 
+        if conditional:
+            noise_module = UniformGaussianNoise()
+            noise_module = noise_module.to(device)
+
         for i in (progress_bar := tqdm(range(batches), disable=not verbose)):
             progress_bar.set_description(f"Epoch {epoch + 1}")
 
@@ -229,8 +236,19 @@ def train(
 
                 optimizer.zero_grad()
 
-                # run the forward model
-                x_net = model(y, physics_cur)
+                if conditional:
+                    x_noisy = noise_module(x)
+                    c = (
+                        physics_cur.A_adjoint(y)
+                        if not model.pinv
+                        else physics_cur.A_dagger(y)
+                    )
+                    # run the forward model
+                    x_net = model(x_noisy, noise_module.sigma, c)
+
+                else:
+                    # run the forward model
+                    x_net = model(y, physics_cur)
 
                 # compute the losses
                 loss_total = 0
