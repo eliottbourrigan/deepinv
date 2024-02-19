@@ -101,7 +101,6 @@ def test_gradient_descent_initialization():
 
 
 def test_gradient_descent_forward():
-
     backbone_blocks = [nn.Linear(10, 10), nn.Linear(10, 10)]
     gd_model = GradientDescent(backbone_blocks, step_size=0.5, iterations=2)
 
@@ -162,7 +161,6 @@ def test_cal_angle():
 
 
 def test_cal_psnr():
-
     a1 = torch.ones((1, 1, 16, 16))
     b1 = torch.zeros((1, 1, 16, 16))
     a2 = [a1]  # a2 is a list in which the first element is a tensor
